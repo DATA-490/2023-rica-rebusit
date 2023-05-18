@@ -13,7 +13,7 @@ Intended audience is for Center for Healthy Communities who wants to understand 
 
 * `data` - Single text file where you would have to ask Robin about the data.
 
-* `documentation` - Notes about meetings, general flow of the classification model, and how to install python.
+* `documentations` - Notes about meetings, general flow of the classification model, and how to install python.
 
 * `presentation` - This file contains the 2023 NSC Poster Session work and the final stakeholder report.
     - `images` - Has the graphs and pictures that were added to the poster and as well as the stakeholder report.
