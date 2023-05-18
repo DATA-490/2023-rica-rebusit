@@ -1,0 +1,400 @@
+---
+title: "playground"
+format: html
+editor: visual
+---
+
+## Setup
+
+Install / load necessary packages and environments. Package installation only needs to be done once. This setup is written from the assumption that no packages have been installed yet.
+
+### Setup R Environment First
+
+https://statsandr.com/blog/an-efficient-way-to-install-and-load-r-packages/
+
+Run this code chunk and you should be all set to go
+
+```{r}
+#Packages needed
+packages <- c("tidytext", "readxl", "topicmodels", "tidyverse", "randomForest", "caret", "modelr", "reticulate", "writexl")
+
+#Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+#Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+The `retculate` package needs to be installed & loaded prior to running any Python code.
+
+### Setup Python Environment
+
+In the R console, run the following code. Again only once.
+
+Refer to these links if you are stuck:
+
+https://rstudio.github.io/reticulate/articles/python_packages.html
+
+https://stackoverflow.com/questions/65973815/how-to-pip-install-python-module-in-rstudio
+
+```{r}
+#| eval: false
+conda_create("r-reticulate")
+conda_install("r-reticulate", "scipy")
+scipy <- import("scipy")
+py_install("pandas", pip = TRUE)
+py_install("openpyxl", pip = TRUE)
+py_install("matplotlib", pip = TRUE)
+```
+
+Then in Python console (You will know you are in Python console if you see "\>\>\>") run the following code to download and import the `punkt` package for the tokenization process. If you get this message
+
+"ModuleNotFoundError: No module named 'nltk'" then chances are you may have two different versions of Python installed. Switch to a terminal and type `pip install nltk`. [Solution ref](https://stackoverflow.com/questions/49466707/no-module-named-nltk)
+
+```{python}
+#| eval: false
+import nltk
+nltk.download('punkt')
+```
+
+### Load Additional Python Libraries
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib as plt
+```
+
+------------------------------------------------------------------------
+
+# Import Data
+
+```{r}
+partnership_data_20_21 <- read_excel("data/Partnership_data.xlsx")
+partnership_data_21_22 <- read_excel("data/parternship_data_21_22.xlsx")
+```
+
+```{r}
+head(partnership_data_20_21)
+head(partnership_data_21_22)
+
+
+names(partnership_data_21_22) #level was logical so converting it to numeric
+
+partnership_data_21_22$"Level (1 lowest-3 highest) \r\n0 - excluded for not enough info" <- as.numeric(as.logical(partnership_data_21_22$"Level (1 lowest-3 highest) \r\n0 - excluded for not enough info"))
+```
+
+```{r}
+summary(partnership_data_20_21)
+summary(partnership_data_21_22)
+unique(partnership_data_21_22$quarter) #No Q4
+unique(partnership_data_21_22$train_meet)
+```
+
+Rename quarter values. There is no Quarter 4, Quarter 4 is NA and rename train_meet binary values. Y is Training and N is Collaborative Meeting
+
+```{r}
+partnership_data_21_22 <- partnership_data_21_22 %>%
+  mutate(quarter = case_when(
+    quarter %in% "Q1 (Oct-Dec)" ~ 1,
+    quarter %in% "Q2 (Jan-Mar)" ~ 2,
+    quarter %in% "Q3 (Apr-Jun)" ~ 3,
+  )) %>%
+  mutate(train_meet = case_when(
+    train_meet == "Y" ~ "Training",
+    train_meet == "N" ~ "Collaborative Meeting", TRUE ~ train_meet))
+head(partnership_data_21_22)
+```
+
+Convert date to character to bind
+
+```{r}
+partnership_data_21_22$date <- as.character(partnership_data_21_22$date)
+head(partnership_data_21_22)
+```
+
+Now bind
+
+```{r}
+partnership20_22 <- bind_rows(partnership_data_20_21, partnership_data_21_22, id = NULL)
+head(partnership20_22)
+```
+
+Renaming level column
+
+```{r}
+partnership20_22 <- partnership20_22 %>% 
+  rename(level = "Level (1 lowest-3 highest) \r\n0 - excluded for not enough info")
+  head(partnership20_22)
+```
+
+creating new excel file
+
+```{r}
+write_xlsx(partnership20_22,"data/partnership20_22.xlsx")
+```
+
+```{python}
+#reading data
+df = pd.read_excel('data/partnership20_22.xlsx')
+df.head(10)
+```
+
+Check what variables are in the data frame.
+
+```{python}
+#Shape and data info
+print("shape of data",df.shape)
+print("data info ",df.info())
+```
+
+Count the number of na values in each colmn
+
+```{python}
+df.isna().sum()
+```
+
+Count the total value of each quarter
+
+```{python}
+df['quarter'].value_counts()
+```
+
+Find which quarter has no value
+
+```{python}
+mode = df['quarter'].value_counts().index[0]
+mode
+```
+
+```{python}
+#Fills na 
+df['quarter']=df['quarter'].fillna(mode)
+#Convert quarter column to integer
+df['quarter'] = df['quarter'].astype(int)
+df['quarter'].value_counts()
+```
+
+Count the total na in each column
+
+```{python}
+df.isna().sum()
+```
+
+```{python}
+import numpy as np
+#Fills in na for level 4 and counts total na
+df['level'] = df['level'].fillna(4)
+df.isna().sum()
+```
+
+Count total values of level column
+
+```{python}
+df['level'].value_counts()
+```
+
+Write a text representation of object to the system clipboard
+
+```{python}
+df.to_clipboard()
+```
+
+NOTE: `year` was dropped here. We need `year`
+
+```{python}
+#Removes 'date' columns
+df.drop(columns=['date'], axis=1, inplace=True)
+df.head(2)
+
+```
+
+```{python}
+#Counts total outliers. If description has length 1 then considered outlier and removed
+def removeOutlier(text):
+    if isinstance(text, float):
+        return 'outlier'
+    text = text.strip() #Removes leading and trailing whitespace characters from the text
+    text = text.split() #Text is a string and splits it into individual words or tokens
+    if len(text)==1:
+        return 'outlier'
+    else:
+        return 'notoutlier'
+    
+df['outlier'] = df['descrip'].apply(removeOutlier)
+df['outlier'].value_counts()
+```
+
+```{python}
+df = df[df['outlier']=='notoutlier']
+df.drop(columns=['outlier'], axis=1, inplace=True)
+df.head(2)
+
+```
+
+Tokenize - process of breaking human-readable text into machine readable components so that raw text can be numbers therefore doing computations
+
+Unsupervised learning - analyze and cluster unlabeled datasets
+
+NOTE: This will take a while
+
+```{python}
+#| include: false
+# need to import nltk at the beginning
+  # talk to Prasana abt all nltk dependencies to be imported
+# the pre-processed data stops at this data block
+from nltk.corpus import stopwords
+import nltk
+nltk.download('stopwords')
+from nltk.tokenize import word_tokenize
+def stopwordRemoval(text):
+    text_tokens = word_tokenize(text)
+    tokens_without_sw = [word for word in text_tokens if not word in stopwords.words()]
+    cleaned = ( ' '.join(tokens_without_sw))
+    return cleaned
+df['descrip'] = df['descrip'].apply(stopwordRemoval)
+df.head(2)
+# stop here #
+```
+
+# Python to R
+
+Will switching the python Dataframe `df` to R dataframe `training`
+
+Training - data to train algorithm or model to predict outcome of your model to predict.
+
+```{r}
+#| include: false
+partnership <- data.frame(py$df)
+head(partnership) #train_meet list type
+```
+
+`train_meet` list type so converting back to character
+
+```{r}
+partnership$train_meet <- as.character(unlist(partnership$train_meet))
+head(partnership)
+```
+
+Sorting `quarter` in ascending order for graphing
+
+```{r}
+partnership <- arrange(partnership, quarter)
+head(partnership)
+```
+
+Now, I'll be tokenizing the data, more specifically the column `descrip` - Did not tokenize data immediately, ask Robin what this code means below
+
+# Creating DTM from DF
+
+DTM (Document-Term Matrix) - matrix which rows = sample of texts and columns = unique words.
+
+From `df`, select column descrip and rename it "text", modifies `df` where number of rows = rows of `descrip` column, so `unnest_tokens` puts a single word in each row, then counts number of words
+
+```{r}
+#creates a new column called 'obs' then splits 'descrip' column into tokens
+clean_partnership <- partnership %>% 
+  select(text = descrip) %>%
+  mutate(obs = 1:NROW(partnership)) %>% 
+  unnest_tokens(word, text)
+```
+
+```{r}
+# creating the count of words per obs
+df.partnership <- clean_partnership %>%
+  count(obs, word)
+
+```
+
+```{r}
+#Turns into a DocumentTermMatrix
+partnership_dfm <- df.partnership %>%
+  cast_dtm(obs, word, n)
+```
+
+`partnership_dfm` is the doc.term matrix being put in LDA
+
+# LDA Model
+
+LDA - generative probabilistic model of a corpus (rows of sample of text), in which LDA will characterize a topic by a distribution of words
+
+```{r}
+#Creates LDA model
+descrip_lda <- LDA(partnership_dfm, k = 5, control = list(seed = 1234))
+descrip_lda
+```
+
+-   can play with k value being 2 or 5
+-   for now let it be 5, adjust accordingly
+
+# Extracting Beta and Gamma from LDA
+
+First extract `Beta`
+
+`Beta` values for probabilities of words in the topic. `Beta` represents the presence of the word in each topic and the higher the beta value, the more frequent it appears in the topic.
+
+```{r}
+# tpw.df, topic per word probability
+tpw.df <- tidy(descrip_lda, matrix = "beta")
+tpw.df
+```
+
+```{r}
+word_prob <- tpw.df %>%
+  pivot_wider(names_from = topic, values_from = beta)
+word_prob
+```
+
+Observations: - I personally think the `beta` prob can be overlooked - I could be wrong, just thinking - `Calfresh` word is the only useful probability, but given its literally calfresh outreach not sure how this is useful
+
+Extracting `Gamma` now
+
+`Gamma` values to look at topics. Based on topic and document what portion of document is made up of a particular topic.
+
+```{r}
+# change variable to dpt, `document per topic probability`
+dpt.df <- tidy(descrip_lda, matrix = "gamma") 
+dpt.df
+```
+
+Observation: - Why is gamma near .5 for most observations - ans: probability of a `document`, (aka word) to show in that topic - Recall document \# is a word in the LDA model - Seems like only two topics. - So the observations above were for `k=2` - For `k=5`, the gamma values `.02 - .005` - BUT `topic` was still either 1 or 2 - ans: didn't mess with data to observe topic varies due to `k` variable
+
+```{r}
+topic_prob <- dpt.df %>%
+  pivot_wider(names_from = topic, values_from = gamma)
+topic_prob
+```
+
+Interpretation of code: - Given a topic, what was the probability `document` 1(2,3,..,etc) would be in said topic - aka **conditional probability**
+
+```{r}
+partnership_topic <- cbind(partnership, topic_prob)
+```
+
+# Clean up and export for phase 2 (classification)
+
+```{r}
+#| eval: false
+# Example if saving more than 1 object
+# Remove data objects that you don't need to pass on to the next phase. 
+rm(packages, installed_packages, scipy, clean_partnership, descrip_lda, df.partnership, dpt.df, partnership, partnership_dfm, topic_prob, tpw.df, word_prob, partnership_data_20_21, partnership_data_21_22, partnership20_22)
+save.image("data/lda_workspace_20_22.Rds")
+```
+
+I think that is how it works, named the single observation as `lda_topic_probability_20_22.Rdata` and moved it to data file.
+
+```{r}
+save(partnership_topic, file = "lda_topic_probability_20_22.Rdata")
+```
+
+-   `save()` saves a single object as a `.Rdata` file
+-   `save.image()` saves the entire global environment as a `.Rds` file.
+
+------------------------------------------------------------------------
+
+Machine learning classification part done in `Random_Forest.qmd`
+
+Check out `poster2023.qmd` to look at graphing topics

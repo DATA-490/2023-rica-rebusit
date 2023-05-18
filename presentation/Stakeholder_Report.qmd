@@ -1,0 +1,174 @@
+---
+title: "CHC Capstone Report"
+format: 
+  revealjs:
+    theme: sky
+---
+
+## Overall Goals and Objectives
+
+<ul style="font-size: 50px;">
+
+-   To be able to predict priority of activities based on text descriptions
+
+-   Understand the impact activities have
+
+-   Provide insight to distributing money
+
+</ul>
+
+## About the Data
+
+<ul style="font-size: 45px;">
+
+-   Subcontractor
+
+-   Fiscal quarter, 3 month period, (1-4)
+
+-   Activity
+
+-   Text description of activity
+
+-   Partner
+
+-   Prescreens
+
+-   Submitted applications
+
+-   The priority
+
+</ul>
+
+## Cleaning and Preprocessing
+
+<ul style="font-size: 30px;">
+
+-   Clean data
+
+    -   Remove whitespace
+
+    -   Remove outliers
+
+-   Tokenize data
+
+    -   Breaks down sentences into words
+
+    -   Removes stopwords such as "and", "the", "to", "we"
+
+</ul>
+
+<center>![](images/descriptokenized.png)</center>
+
+## Latent Dirichlet Allocation (LDA)
+
+<ul style="font-size: 40px;">
+
+-   Clusters rows of "documents" to find topics
+
+-   The documents are the text descriptions
+
+-   Calculates probabilities of topics for each description
+
+</ul>
+
+<center>![](images/LDAvisual.png){width="570"}</center>
+
+## Latent Dirichlet Allocation (LDA)
+
+<center>![](images/descripwithprob.png)</center>
+
+## Latent Dirichlet Allocation (LDA)
+
+<center>![](images/beta.png){width="600"}</center>
+
+## Latent Dirichlet Allocation (LDA)
+
+<center>![](images/gamma.png){width="600"}</center>
+
+## Random Forest Classification
+
+<ul style="font-size: 40px;">
+
+-   Machine learning model
+
+-   Accurately predict the target variable
+
+-   Uses decision trees
+
+</ul>
+
+<center>![](images/tree.png){width="570"}</center>
+
+## Random Forest Classification
+
+<ul style="font-size: 40px;">
+
+-   Multiple decision trees output a prediction
+
+-   Predictions merge for a majority vote
+
+-   The majority vote is the final prediction
+
+</ul>
+
+<center>![](images/treecartoon.png){width="410"}</center>
+
+## Random Forest Classification
+
+<center>![](images/rf.png){width="600"}</center>
+
+## Predicting the Priority
+
+<ul style="font-size: 50px;">
+
+-   Go through the process with new data
+
+-   Update the random forest model including the new data by combining with the previous data
+
+-   Then we can predict the priority
+
+-   Continuous learning
+
+</ul>
+
+## General Flow
+
+::: {style="display: flex; justify-content: center; align-items: flex-end; height: 400px;"}
+```{mermaid}
+%%| fig-width: 14
+flowchart LR
+  A(Subcontractor Features) --> H(Random Forest Model)
+  B(Numerics) --> H(Random Forest Model)
+  C(Collect Data) --> D(Clean and Preprocess) --> E(Tokenize) --> F(LDA) --> G(Data with Topic Probabilities) --> H(Random Forest Model)
+```
+:::
+
+## Limitations
+
+<ul style="font-size: 50px;">
+
+-   Limited true data
+
+-   Inconsistencies may occur in cleaning and tokenization process
+
+-   Imbalances with priority levels
+
+</ul>
+
+## Future Work
+
+<ul style="font-size: 50px;">
+
+-   Get more labeled data
+
+-   Update and refine cleaning and tokenization process
+
+-   Consider using other topic and classification models and compare
+
+</ul>
+
+# Thank You!
+
+## References
+
+https://chirag-sehra.medium.com/decision-trees-explained-easily-28f23241248

@@ -1,0 +1,154 @@
+---
+title: "poster2023"
+format: html
+editor: visual
+---
+
+Graphs to add for poster
+
+# Topic Graphs
+
+First go to `LDA.qmd` using the `Partnership_data.xlsx` data set and run everything up until the end of LDA model
+
+Once you do that, this will be the graph for visualizing words in topics
+
+```{r}
+beta <- tpw.df %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+```
+
+```{r}
+beta %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered() +
+  xlab("Probability") +
+  ylab("Word") + 
+  labs(title = "Grouped Terms") +
+  theme_minimal()
+```
+
+Saving graph image
+
+```{r}
+ggsave("beta.png")
+```
+
+Now graph for visualizing probability topics in activity description
+
+```{r}
+gamma <- data.frame(dpt.df)
+gamma$document <- rep(1:dim(partnership_dfm) [1],5)
+```
+
+```{r}
+g <- ggplot(gamma, aes(document, gamma, group = factor(topic), fill = factor(topic))) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ factor(topic), ncol = 1) +
+  labs(title = "Topics of Each Document") +
+  ylab("Probability") +
+  xlab("Activity Description")
+  theme_minimal()
+```
+
+Saving graph image
+
+```{r}
+ggsave("gamma.png")
+```
+
+```{r}
+head(partnership_topic)
+filter(partner_topic, quarter == 1 ) # 294
+filter(partner_topic, quarter == 2) # 344
+filter(partner_topic, quarter == 3) # 344
+filter(partner_topic, quarter == 4) # 3
+```
+
+# Random Forest Importance Graph
+
+Load `partnership_topic` and `gcf20_21` and run the following code chunks
+
+```{r}
+partnership_topic <- partnership_topic %>% 
+  rename(shortcode = y2n, 
+         level = Level..1.lowest.3.highest...n0...excluded.for.not.enough.info,
+         contract_year = year,
+         topic_1 = "1",
+         topic_2 = "2",
+         topic_3 = "3",
+         topic_4 = "4",
+         topic_5 = "5")
+```
+
+```{r}
+gcf20_21 <- gcf20_21 %>%
+  mutate(quarter = case_when(
+    month %in% c(10,11,12) ~ 1,
+    month %in% c(1,2,3) ~ 2,
+    month %in% c(4,5,6) ~ 3,
+    month %in% c(7,8,9) ~ 4
+  )) %>%
+  select(c("shortcode", "prescreens", "totalapps", "contract_year", "quarter"))
+head(gcf20_21)
+```
+
+```{r}
+gcf20_21 <- gcf20_21 %>%
+  group_by(shortcode, quarter, contract_year) %>%
+  summarise(across(where(is.numeric), sum))
+head(gcf20_21)
+```
+
+```{r}
+lda_gcf <- left_join(partnership_topic, gcf20_21, by = c("shortcode", "contract_year", "quarter"))
+head(lda_gcf)
+```
+
+```{r}
+library(randomForest)
+```
+
+Removing these columns for importance graph
+
+```{r}
+lda_gcf <- select(lda_gcf, -c("contract_year", "descrip", "document"))
+lda_gcf$quarter <- as.factor(lda_gcf$quarter)
+lda_gcf$level <- as.factor(lda_gcf$level)
+head(lda_gcf)
+```
+
+```{r}
+tra.tes <- sample(c(TRUE, FALSE), nrow(lda_gcf), replace = TRUE, prob=c(.7,.3))
+tra <- lda_gcf[tra.tes, ]
+tes <- lda_gcf[-tra.tes, ]
+tra <- tra[complete.cases(tra), ]
+```
+
+```{r}
+set.seed(123)
+rf <- randomForest(level ~ ., data = tra, proximity = TRUE, importance = TRUE)
+rf
+```
+
+```{r}
+importance <- as.data.frame(round(importance(rf), digits = 4))
+mdg <- importance[, "MeanDecreaseGini"]
+df <- data.frame(feature = row.names(importance), importance = mdg)
+```
+
+```{r}
+ggplot(df, aes(x = feature, y = impportance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Important Variables to Predict Activity Priority", x = "Variable", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+ggsave("rf.png")
+```
