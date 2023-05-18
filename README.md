@@ -1,7 +1,7 @@
 # <Project Title>
 * **Author**: Rica Rebusit, github: [rrebusit](https://github.com/rrebusit)
 * **Major**: B.S. Applied Mathematics
-* **Year**: Senior 2023
+* **Year**: Senior, Spring 2023
 
 # Type of project
 Text descriptions are reported and text based and machine learning models are used to predict the priority of the activity based on the descriptions. Descriptions are cleaned and tokenized where topic modeling such as Latent Dirichlet Allocation is used to find key topics from clustering the rows of activity descriptions. Then to predict the priority of the activity, Random Forest classification machine learning model is used. Most of work was organizing and cleaning up to streamline predicting process.
